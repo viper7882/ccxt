@@ -274,6 +274,7 @@ class bybit(Exchange):
                         'v2/public/account-ratio': 1,
                         'v2/public/funding-rate': 1,
                         'v2/public/elite-ratio': 1,
+                        'v2/public/funding/prev-funding-rate': 1,
                         'v2/public/risk-limit/list': 1,
                         # linear swap USDT
                         'public/linear/kline': 3,
@@ -313,6 +314,7 @@ class bybit(Exchange):
                         'perpetual/usdc/openapi/public/v1/open-interest': 1,
                         'perpetual/usdc/openapi/public/v1/big-deal': 1,
                         'perpetual/usdc/openapi/public/v1/account-ratio': 1,
+                        'perpetual/usdc/openapi/public/v1/prev-funding-rate': 1,
                         'perpetual/usdc/openapi/public/v1/risk-limit/list': 1,
                     },
                     # outdated endpoints--------------------------------------
@@ -1615,8 +1617,12 @@ class bybit(Exchange):
         request = {
             'symbol': market['id'],
         }
-        method = 'publicLinearGetFundingPrevFundingRate' if market['linear'] else 'v2PublicGetFundingPrevFundingRate'
-        # TODO method = 'publicGetPublicLinearFundingPrevFundingRate' if market['linear'] else 'publicGetV2PublicFundingRate ???? throws ExchangeError'
+        isUsdcSettled = market['settle'] == 'USDC'
+        method = None
+        if isUsdcSettled:
+            method = 'publicGetPerpetualUsdcOpenapiPublicV1PrevFundingRate'
+        else:
+            method = 'publicLinearGetFundingPrevFundingRate' if market['linear'] else 'publicGetV2PublicFundingPrevFundingRate'
         response = getattr(self, method)(self.extend(request, params))
         #
         #     {
@@ -1644,11 +1650,24 @@ class bybit(Exchange):
         #         },
         #         "time_now":"1647040852.515724"
         #     }
+        # usdc
+        #     {
+        #         "retCode":0,
+        #         "retMsg":"",
+        #         "result":{
+        #            "symbol":"BTCPERP",
+        #            "fundingRate":"0.00010000",
+        #            "fundingRateTimestamp":"1652112000000"
+        #         }
+        #     }
         #
         result = self.safe_value(response, 'result')
-        fundingRate = self.safe_number(result, 'funding_rate')
+        fundingRate = self.safe_number_2(result, 'funding_rate', 'fundingRate')
         fundingTimestamp = self.parse8601(self.safe_string(result, 'funding_rate_timestamp'))
-        fundingTimestamp = self.safe_timestamp(result, 'funding_rate_timestamp', fundingTimestamp)
+        if fundingTimestamp is None:
+            fundingTimestamp = self.safe_timestamp_2(result, 'funding_rate_timestamp', fundingTimestamp)
+            if fundingTimestamp is None:
+                fundingTimestamp = self.safe_integer(result, 'fundingRateTimestamp')
         currentTime = self.milliseconds()
         return {
             'info': result,
