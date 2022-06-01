@@ -665,8 +665,8 @@ class bybit(Exchange):
                 'trading': {
                     'tierBased': False,
                     'percentage': True,
-                    'taker': 0.00075,
-                    'maker': -0.00025,
+                    'taker': 0.0006,
+                    'maker': 0.0001,
                 },
                 'funding': {
                     'tierBased': False,
