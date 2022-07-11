@@ -2330,7 +2330,15 @@ class bybit(Exchange):
         #     }
         #
         result = self.safe_value(response, 'result')
-        return self.parse_order(result, market)
+        order = self.parse_order(result, market)
+
+        # print("{} Line: order:".format(
+        #     inspect.getframeinfo(inspect.currentframe()).function,
+        #     inspect.getframeinfo(inspect.currentframe()).lineno,
+        # ))
+        # pprint(order)
+
+        return order
 
     def create_order(self, symbol, type, side, amount, price=None, params={}):
         self.load_markets()
@@ -2386,12 +2394,22 @@ class bybit(Exchange):
         if stop_loss:
             request['stop_loss'] = stop_loss
 
+        reduce_only = self.safe_value(params, 'reduce_only')
+        close_on_trigger = self.safe_value(params, 'close_on_trigger')
+
         method = None
         if market['swap']:
             if market['linear']:
                 method = 'privateLinearPostOrderCreate'
-                request['reduce_only'] = False
-                request['close_on_trigger'] = False
+                if reduce_only:
+                    request['reduce_only'] = reduce_only
+                else:
+                    request['reduce_only'] = False
+
+                if close_on_trigger:
+                    request['close_on_trigger'] = close_on_trigger
+                else:
+                    request['close_on_trigger'] = False
             elif market['inverse']:
                 method = 'v2PrivatePostOrderCreate'
         elif market['future']:
@@ -2414,6 +2432,7 @@ class bybit(Exchange):
         elif basePrice is not None:
             raise ArgumentsRequired(self.id + ' createOrder() requires both the stop_px and base_price params for a conditional ' + type + ' order')
 
+        response = None
         try:
             response = getattr(self, method)(self.extend(request, params))
         except (BadRequest, InvalidOrder, ExchangeError):
@@ -2505,8 +2524,11 @@ class bybit(Exchange):
         #         "rate_limit": "100"
         #     }
         #
-        result = self.safe_value(response, 'result')
-        return self.parse_order(result, market)
+        if response is not None:
+            result = self.safe_value(response, 'result')
+            return self.parse_order(result, market)
+        else:
+            return None
 
     def edit_order(self, id, symbol, type, side, amount=None, price=None, params={}):
         if symbol is None:
