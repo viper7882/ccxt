@@ -461,7 +461,7 @@ declare module 'ccxt' {
     export class bitbns extends Exchange {}
     export class bitcoincom extends fmfwio {}
     export class bitfinex extends Exchange {}
-    export class bitfinex2 extends bitfinex {}
+    export class bitfinex2 extends Exchange {}
     export class bitflyer extends Exchange {}
     export class bitforex extends Exchange {}
     export class bitget extends Exchange {}
@@ -481,6 +481,7 @@ declare module 'ccxt' {
     export class blockchaincom extends Exchange {}
     export class btcalpha extends Exchange {}
     export class btcbox extends Exchange {}
+    export class btcex extends Exchange {}
     export class btcmarkets extends Exchange {}
     export class btctradeua extends Exchange {}
     export class btcturk extends Exchange {}
@@ -511,7 +512,8 @@ declare module 'ccxt' {
     export class fmfwio extends hitbtc {}
     export class ftx extends Exchange {}
     export class ftxus extends ftx {}
-    export class gateio extends Exchange {}
+    export class gate extends Exchange {}
+    export class gateio extends gate {}
     export class gemini extends Exchange {}
     export class hitbtc extends Exchange {}
     export class hitbtc3 extends Exchange {}
@@ -529,11 +531,13 @@ declare module 'ccxt' {
     export class kuna extends Exchange {}
     export class latoken extends Exchange {}
     export class lbank extends Exchange {}
+    export class lbank2 extends Exchange {}
     export class liquid extends Exchange {}
     export class luno extends Exchange {}
     export class lykke extends Exchange {}
     export class mercado extends Exchange {}
     export class mexc extends Exchange {}
+    export class mexc3 extends Exchange {}
     export class ndax extends Exchange {}
     export class novadax extends Exchange {}
     export class oceanex extends Exchange {}
@@ -603,6 +607,7 @@ declare module 'ccxt' {
         | 'blockchaincom'
         | 'btcalpha'
         | 'btcbox'
+        | 'btcex'
         | 'btcmarkets'
         | 'btctradeua'
         | 'btcturk'
@@ -633,6 +638,7 @@ declare module 'ccxt' {
         | 'fmfwio'
         | 'ftx'
         | 'ftxus'
+        | 'gate'
         | 'gateio'
         | 'gemini'
         | 'hitbtc'
@@ -651,11 +657,13 @@ declare module 'ccxt' {
         | 'kuna'
         | 'latoken'
         | 'lbank'
+        | 'lbank2'
         | 'liquid'
         | 'luno'
         | 'lykke'
         | 'mercado'
         | 'mexc'
+        | 'mexc3'
         | 'ndax'
         | 'novadax'
         | 'oceanex'

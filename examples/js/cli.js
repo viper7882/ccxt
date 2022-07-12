@@ -74,7 +74,6 @@ let settings = localKeysFile ? (require (localKeysFile)[exchangeId] || {}) : {}
 
 const timeout = 30000
 let exchange = undefined
-const enableRateLimit = true
 
 const { Agent } = require ('https')
 
@@ -85,12 +84,7 @@ const httpsAgent = new Agent ({
 
 try {
 
-    exchange = new (ccxt)[exchangeId] ({
-        timeout,
-        enableRateLimit,
-        httpsAgent,
-        ... settings,
-    })
+    exchange = new (ccxt)[exchangeId] ({ timeout, httpsAgent, ... settings })
 
     if (isSpot) {
         exchange.options['defaultType'] = 'spot';
@@ -202,8 +196,7 @@ const printHumanReadable = (exchange, result) => {
 
 //-----------------------------------------------------------------------------
 
-
-async function main () {
+async function run () {
 
     if (!exchangeId) {
 
@@ -280,8 +273,9 @@ async function main () {
                         const result = await exchange[methodName] (... args)
                         end = exchange.milliseconds ()
                         console.log (exchange.iso8601 (end), 'iteration', i++, 'passed in', end - start, 'ms\n')
-                        start = end
                         printHumanReadable (exchange, result)
+                        console.log (exchange.iso8601 (end), 'iteration', i, 'passed in', end - start, 'ms\n')
+                        start = end
                     } catch (e) {
                         if (e instanceof ExchangeError) {
                             log.red (e.constructor.name, e.message)
@@ -321,4 +315,4 @@ async function main () {
 
 //-----------------------------------------------------------------------------
 
-main ()
+run ()

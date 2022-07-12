@@ -5,7 +5,6 @@
 
 from ccxt.async_support.base.exchange import Exchange
 import hashlib
-import math
 import json
 from ccxt.base.errors import ExchangeError
 from ccxt.base.errors import AuthenticationError
@@ -20,6 +19,7 @@ from ccxt.base.errors import OrderNotFound
 from ccxt.base.errors import DDoSProtection
 from ccxt.base.errors import RateLimitExceeded
 from ccxt.base.errors import ExchangeNotAvailable
+from ccxt.base.decimal_to_precision import TICK_SIZE
 from ccxt.base.precise import Precise
 
 
@@ -30,7 +30,8 @@ class bibox(Exchange):
             'id': 'bibox',
             'name': 'Bibox',
             'countries': ['CN', 'US', 'KR'],
-            'version': 'v1',
+            'rateLimit': 166.667,
+            'version': 'v3.1',
             'hostname': 'bibox.com',
             'has': {
                 'CORS': None,
@@ -42,6 +43,9 @@ class bibox(Exchange):
                 'cancelOrder': True,
                 'createMarketOrder': None,  # or they will return https://github.com/ccxt/ccxt/issues/2338
                 'createOrder': True,
+                'createStopLimitOrder': False,  # True for contract
+                'createStopMarketOrder': False,  # True for contract
+                'createStopOrder': False,  # True for contract
                 'fetchBalance': True,
                 'fetchBorrowRate': False,
                 'fetchBorrowRates': False,
@@ -49,19 +53,22 @@ class bibox(Exchange):
                 'fetchCurrencies': True,
                 'fetchDepositAddress': True,
                 'fetchDeposits': True,
-                'fetchFundingFees': True,
+                'fetchMarginMode': False,
                 'fetchMarkets': True,
                 'fetchMyTrades': True,
                 'fetchOHLCV': True,
                 'fetchOpenOrders': True,
                 'fetchOrder': True,
                 'fetchOrderBook': True,
+                'fetchPositionMode': False,
                 'fetchTicker': True,
                 'fetchTickers': True,
                 'fetchTrades': True,
                 'fetchTradingFee': False,
                 'fetchTradingFees': False,
+                'fetchTransactionFees': True,
                 'fetchWithdrawals': True,
+                'transfer': None,
                 'withdraw': True,
             },
             'timeframes': {
@@ -83,36 +90,198 @@ class bibox(Exchange):
                 'www': 'https://www.bibox365.com',
                 'doc': [
                     'https://biboxcom.github.io/en/',
+                    'https://biboxcom.github.io/v3/spot/en/',
+                    'https://biboxcom.github.io/api/spot/v4',
                 ],
                 'fees': 'https://bibox.zendesk.com/hc/en-us/articles/360002336133',
                 'referral': 'https://w2.bibox365.com/login/register?invite_code=05Kj3I',
             },
             'api': {
-                'public': {
-                    'post': [
-                        # TODO: rework for full endpoint/cmd paths here
-                        'mdata',
-                    ],
-                    'get': [
-                        'cquery',
-                        'mdata',
-                        'cdata',
-                        'orderpending',
-                    ],
+                'v1': {
+                    'public': {
+                        'get': {
+                            'cquery': 1,
+                            'mdata': 1,
+                            'cdata': 1,
+                            'orderpending': 1,
+                        },
+                        'post': {
+                            'mdata': 1,
+                        },
+                    },
+                    'private': {
+                        'post': {
+                            'credit': 1,
+                            'cquery': 1,
+                            'ctrade': 1,
+                            'user': 1,
+                            'orderpending': 1,
+                            'transfer': 1,
+                        },
+                    },
                 },
-                'private': {
-                    'post': [
-                        'cquery',
-                        'ctrade',
-                        'user',
-                        'orderpending',
-                        'transfer',
-                    ],
+                'v1.1': {
+                    'public': {
+                        'get': [
+                            'cquery',
+                        ],
+                    },
+                    'private': {
+                        'post': [
+                            'cquery',
+                            'ctrade',
+                        ],
+                    },
                 },
-                'v2private': {
-                    'post': [
-                        'assets/transfer/spot',
-                    ],
+                'v2': {
+                    'public': {
+                        'get': [
+                            'mdata/kline',
+                            'mdata/depth',
+                        ],
+                    },
+                    'private': {
+                        'post': [
+                            'assets/transfer/spot',
+                        ],
+                    },
+                },
+                'v3': {
+                    'public': {
+                        'get': [
+                            'mdata/ping',
+                            'mdata/pairList',
+                            'mdata/kline',
+                            'mdata/marketAll',
+                            'mdata/market',
+                            'mdata/depth',
+                            'mdata/deals',
+                            'mdata/ticker',
+                            'cbc/timestamp',
+                            'cbu/timestamp',
+                        ],
+                    },
+                    'private': {
+                        'post': [
+                            'assets/transfer/spot',
+                            'assets/transfer/cbc',
+                            'cbc/order/open',
+                            'cbc/order/close',
+                            'cbc/order/closeBatch',
+                            'cbc/order/closeAll',
+                            'cbc/changeMargin',
+                            'cbc/changeMode',
+                            'cbc/assets',
+                            'cbc/position',
+                            'cbc/order/list',
+                            'cbc/order/detail',
+                            'cbc/order/listBatch',
+                            'cbc/order/listBatchByClientOid',
+                            'cbuassets/transfer',
+                            'cbu/order/open',
+                            'cbu/order/close',
+                            'cbu/order/closeBatch',
+                            'cbu/order/closeAll',
+                            'cbu/order/planOpen',
+                            'cbu/order/planOrderList',
+                            'cbu/order/planClose',
+                            'cbu/order/planCloseAll',
+                            'cbu/changeMargin',
+                            'cbu/changeMode',
+                            'cbu/assets',
+                            'cbu/position',
+                            'cbu/order/list',
+                            'bu/order/detail',
+                            'cbu/order/listBatch',
+                            'cbu/order/listBatchByClientOid',
+                        ],
+                    },
+                },
+                'v3.1': {
+                    'public': {
+                        'get': [
+                            'mdata/ping',
+                            'cquery/buFundRate',
+                            'cquery/buTagPrice',
+                            'cquery/buValue',
+                            'cquery/buUnit',
+                            'cquery/bcFundRate',
+                            'cquery/bcTagPrice',
+                            'cquery/bcValue',
+                            'cquery/bcUnit',
+                        ],
+                    },
+                    'private': {
+                        'get': [
+                            'orderpending/tradeLimit',
+                        ],
+                        'post': [
+                            'transfer/mainAssets',
+                            'spot/account/assets',
+                            'transfer/transferIn',
+                            'transfer/transferOut',
+                            'transfer/transferInList',
+                            'transfer/transferOutList',
+                            'transfer/coinConfig',
+                            'transfer/withdrawInfo',
+                            'orderpending/trade',
+                            'orderpending/cancelTrade',
+                            'orderpending/orderPendingList',
+                            'orderpending/pendingHistoryList',
+                            'orderpending/orderDetail',
+                            'orderpending/order',
+                            'orderpending/orderHistoryList',
+                            'orderpending/orderDetailsLast',
+                            'credit/transferAssets/base2credit',
+                            'credit/transferAssets/credit2base',
+                            'credit/lendOrder/get',
+                            'credit/borrowOrder/get',
+                            'credit/lendOrderbook/get',
+                            'credit/transferAssets/lendAssets',
+                            'credit/transferAssets/borrowAssets',
+                            'credit/borrowOrder/autobook',
+                            'credit/borrowOrder/refund',
+                            'credit/lendOrderbook/publish',
+                            'credit/lendOrderbook/cancel',
+                            'credit/trade/trade',
+                            'credit/trade/cancel',
+                            'cquery/base_u/dealLog',
+                            'cquery/base_u/orderDetail',
+                            'cquery/base_u/orderHistory',
+                            'cquery/base_u/orderById',
+                            'cquery/base_coin/dealLog',
+                            'cquery/base_coin/orderDetail',
+                            'cquery/base_coin/orderHistory',
+                            'cquery/base_coin/orderById',
+                        ],
+                    },
+                },
+                'v4': {
+                    'public': {
+                        'get': [
+                            'marketdata/pairs',
+                            'marketdata/order_book',
+                            'marketdata/candles',
+                            'marketdata/trades',
+                            'marketdata/tickers',
+                        ],
+                    },
+                    'private': {
+                        'get': [
+                            'userdata/accounts',
+                            'userdata/ledger',
+                            'userdata/order',
+                            'userdata/orders',
+                        ],
+                        'post': [
+                            'userdata/order',
+                        ],
+                        'delete': [
+                            'userdata/order',
+                            'userdata/orders',
+                            'userdata/fills',
+                        ],
+                    },
                 },
             },
             'fees': {
@@ -129,6 +298,7 @@ class bibox(Exchange):
                     'deposit': {},
                 },
             },
+            'precisionMode': TICK_SIZE,
             'exceptions': {
                 '2011': AccountSuspended,  # Account is locked
                 '2015': AuthenticationError,  # Google authenticator is wrong
@@ -169,10 +339,15 @@ class bibox(Exchange):
         })
 
     async def fetch_markets(self, params={}):
+        """
+        retrieves data on all markets for bibox
+        :param dict params: extra parameters specific to the exchange api endpoint
+        :returns [dict]: an array of objects representing market data
+        """
         request = {
             'cmd': 'pairList',
         }
-        response = await self.publicGetMdata(self.extend(request, params))
+        response = await self.v1PublicGetMdata(self.extend(request, params))
         #
         #     {
         #         "result": [
@@ -190,11 +365,11 @@ class bibox(Exchange):
         #         "ver":"1.1"
         #     }
         #
-        markets = self.safe_value(response, 'result')
+        markets = self.safe_value(response, 'result', [])
         request2 = {
             'cmd': 'tradeLimit',
         }
-        response2 = await self.publicGetOrderpending(self.extend(request2, params))
+        response2 = await self.v1PublicGetOrderpending(self.extend(request2, params))
         #
         #    {
         #         result: {
@@ -261,8 +436,8 @@ class bibox(Exchange):
                 'strike': None,
                 'optionType': None,
                 'precision': {
-                    'amount': self.safe_integer(market, 'amount_scale'),
-                    'price': self.safe_integer(market, 'decimal'),
+                    'amount': self.parse_number(self.parse_precision(self.safe_string(market, 'amount_scale'))),
+                    'price': self.parse_number(self.parse_precision(self.safe_string(market, 'decimal'))),
                 },
                 'limits': {
                     'leverage': {
@@ -322,23 +497,36 @@ class bibox(Exchange):
             'baseVolume': baseVolume,
             'quoteVolume': self.safe_string(ticker, 'amount'),
             'info': ticker,
-        }, market, False)
+        }, market)
 
     async def fetch_ticker(self, symbol, params={}):
+        """
+        fetches a price ticker, a statistical calculation with the information calculated over the past 24 hours for a specific market
+        :param str symbol: unified symbol of the market to fetch the ticker for
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns dict: a `ticker structure <https://docs.ccxt.com/en/latest/manual.html#ticker-structure>`
+        """
         await self.load_markets()
         market = self.market(symbol)
         request = {
             'cmd': 'ticker',
             'pair': market['id'],
         }
-        response = await self.publicGetMdata(self.extend(request, params))
+        response = await self.v1PublicGetMdata(self.extend(request, params))
         return self.parse_ticker(response['result'], market)
 
     async def fetch_tickers(self, symbols=None, params={}):
+        await self.load_markets()
+        """
+        fetches price tickers for multiple markets, statistical calculations with the information calculated over the past 24 hours each market
+        :param [str]|None symbols: unified symbols of the markets to fetch the ticker for, all market tickers are returned if not assigned
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns dict: an array of `ticker structures <https://docs.ccxt.com/en/latest/manual.html#ticker-structure>`
+        """
         request = {
             'cmd': 'marketAll',
         }
-        response = await self.publicGetMdata(self.extend(request, params))
+        response = await self.v1PublicGetMdata(self.extend(request, params))
         tickers = self.parse_tickers(response['result'], symbols)
         result = self.index_by(tickers, 'symbol')
         return self.filter_by_array(result, 'symbol', symbols)
@@ -383,6 +571,14 @@ class bibox(Exchange):
         }, market)
 
     async def fetch_trades(self, symbol, since=None, limit=None, params={}):
+        """
+        get the list of most recent trades for a particular symbol
+        :param str symbol: unified symbol of the market to fetch trades for
+        :param int|None since: timestamp in ms of the earliest trade to fetch
+        :param int|None limit: the maximum amount of trades to fetch
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns [dict]: a list of `trade structures <https://docs.ccxt.com/en/latest/manual.html?#public-trades>`
+        """
         await self.load_markets()
         market = self.market(symbol)
         request = {
@@ -391,10 +587,17 @@ class bibox(Exchange):
         }
         if limit is not None:
             request['size'] = limit  # default = 200
-        response = await self.publicGetMdata(self.extend(request, params))
+        response = await self.v1PublicGetMdata(self.extend(request, params))
         return self.parse_trades(response['result'], market, since, limit)
 
     async def fetch_order_book(self, symbol, limit=None, params={}):
+        """
+        fetches information on open orders with bid(buy) and ask(sell) prices, volumes and other data
+        :param str symbol: unified symbol of the market to fetch the order book for
+        :param int|None limit: the maximum amount of order book entries to return
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns dict: A dictionary of `order book structures <https://docs.ccxt.com/en/latest/manual.html#order-book-structure>` indexed by market symbols
+        """
         await self.load_markets()
         market = self.market(symbol)
         request = {
@@ -403,8 +606,8 @@ class bibox(Exchange):
         }
         if limit is not None:
             request['size'] = limit  # default = 200
-        response = await self.publicGetMdata(self.extend(request, params))
-        return self.parse_order_book(response['result'], symbol, self.safe_number(response['result'], 'update_time'), 'bids', 'asks', 'price', 'volume')
+        response = await self.v1PublicGetMdata(self.extend(request, params))
+        return self.parse_order_book(response['result'], market['symbol'], self.safe_number(response['result'], 'update_time'), 'bids', 'asks', 'price', 'volume')
 
     def parse_ohlcv(self, ohlcv, market=None):
         #
@@ -427,6 +630,15 @@ class bibox(Exchange):
         ]
 
     async def fetch_ohlcv(self, symbol, timeframe='1m', since=None, limit=1000, params={}):
+        """
+        fetches historical candlestick data containing the open, high, low, and close price, and the volume of a market
+        :param str symbol: unified symbol of the market to fetch OHLCV data for
+        :param str timeframe: the length of time each candle represents
+        :param int|None since: timestamp in ms of the earliest candle to fetch
+        :param int|None limit: the maximum amount of candles to fetch
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns [[int]]: A list of candles ordered as timestamp, open, high, low, close, volume
+        """
         await self.load_markets()
         market = self.market(symbol)
         request = {
@@ -435,7 +647,7 @@ class bibox(Exchange):
             'period': self.timeframes[timeframe],
             'size': limit,
         }
-        response = await self.publicGetMdata(self.extend(request, params))
+        response = await self.v1PublicGetMdata(self.extend(request, params))
         #
         #     {
         #         "result":[
@@ -451,6 +663,11 @@ class bibox(Exchange):
         return self.parse_ohlcvs(result, market, timeframe, since, limit)
 
     async def fetch_currencies(self, params={}):
+        """
+        fetches all available currencies on an exchange
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns dict: an associative dictionary of currencies
+        """
         if self.check_required_credentials(False):
             return await self.fetch_currencies_private(params)
         else:
@@ -460,9 +677,9 @@ class bibox(Exchange):
         request = {
             'cmd': 'currencies',
         }
-        response = await self.publicGetCdata(self.extend(request, params))
+        response = await self.v1PublicGetCdata(self.extend(request, params))
         #
-        # publicGetCdata
+        # v1PublicGetCdata
         #
         #     {
         #         "result":[
@@ -481,14 +698,14 @@ class bibox(Exchange):
         #         "cmd":"currencies"
         #     }
         #
-        currencies = self.safe_value(response, 'result')
+        currencies = self.safe_value(response, 'result', [])
         result = {}
         for i in range(0, len(currencies)):
             currency = currencies[i]
             id = self.safe_string(currency, 'symbol')
             name = self.safe_string(currency, 'name')  # contains hieroglyphs causing python ASCII bug
             code = self.safe_currency_code(id)
-            precision = self.safe_integer(currency, 'valid_decimals')
+            precision = self.parse_number(self.parse_precision(self.safe_string(currency, 'valid_decimals')))
             deposit = self.safe_value(currency, 'enable_deposit')
             withdraw = self.safe_value(currency, 'enable_withdraw')
             active = (deposit and withdraw)
@@ -504,7 +721,7 @@ class bibox(Exchange):
                 'precision': precision,
                 'limits': {
                     'amount': {
-                        'min': math.pow(10, -precision),
+                        'min': precision,
                         'max': None,
                     },
                     'withdraw': {
@@ -522,7 +739,7 @@ class bibox(Exchange):
             'cmd': 'transfer/coinList',
             'body': {},
         }
-        response = await self.privatePostTransfer(self.extend(request, params))
+        response = await self.v1PrivatePostTransfer(self.extend(request, params))
         #
         #     {
         #         "result":[
@@ -576,14 +793,14 @@ class bibox(Exchange):
         #
         outerResults = self.safe_value(response, 'result')
         firstResult = self.safe_value(outerResults, 0, {})
-        currencies = self.safe_value(firstResult, 'result')
+        currencies = self.safe_value(firstResult, 'result', [])
         result = {}
         for i in range(0, len(currencies)):
             currency = currencies[i]
             id = self.safe_string(currency, 'symbol')
             name = currency['name']  # contains hieroglyphs causing python ASCII bug
             code = self.safe_currency_code(id)
-            precision = 8
+            precision = self.parse_number('0.00000001')
             deposit = self.safe_value(currency, 'enable_deposit')
             withdraw = self.safe_value(currency, 'enable_withdraw')
             active = (deposit and withdraw)
@@ -597,12 +814,12 @@ class bibox(Exchange):
                 'precision': precision,
                 'limits': {
                     'amount': {
-                        'min': math.pow(10, -precision),
-                        'max': math.pow(10, precision),
+                        'min': precision,
+                        'max': None,
                     },
                     'withdraw': {
                         'min': None,
-                        'max': math.pow(10, precision),
+                        'max': None,
                     },
                 },
             }
@@ -625,6 +842,11 @@ class bibox(Exchange):
         return self.safe_balance(result)
 
     async def fetch_balance(self, params={}):
+        """
+        query for balance and get the amount of funds available for trading or funds locked in orders
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns dict: a `balance structure <https://docs.ccxt.com/en/latest/manual.html?#balance-structure>`
+        """
         await self.load_markets()
         type = self.safe_string(params, 'type', 'assets')
         params = self.omit(params, 'type')
@@ -634,7 +856,7 @@ class bibox(Exchange):
                 'select': 1,  # return full info
             }, params),
         }
-        response = await self.privatePostTransfer(request)
+        response = await self.v1PrivatePostTransfer(request)
         #
         #     {
         #         "result":[
@@ -657,6 +879,14 @@ class bibox(Exchange):
         return self.parse_balance(response)
 
     async def fetch_deposits(self, code=None, since=None, limit=None, params={}):
+        """
+        fetch all deposits made to an account
+        :param str|None code: unified currency code
+        :param int|None since: the earliest time in ms to fetch deposits for
+        :param int|None limit: the maximum number of deposits structures to retrieve
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns [dict]: a list of `transaction structures <https://docs.ccxt.com/en/latest/manual.html#transaction-structure>`
+        """
         await self.load_markets()
         if limit is None:
             limit = 100
@@ -668,7 +898,7 @@ class bibox(Exchange):
         if code is not None:
             currency = self.currency(code)
             request['symbol'] = currency['id']
-        response = await self.privatePostTransfer({
+        response = await self.v1PrivatePostTransfer({
             'cmd': 'transfer/transferInList',
             'body': self.extend(request, params),
         })
@@ -712,6 +942,14 @@ class bibox(Exchange):
         return self.parse_transactions(deposits, currency, since, limit)
 
     async def fetch_withdrawals(self, code=None, since=None, limit=None, params={}):
+        """
+        fetch all withdrawals made from an account
+        :param str|None code: unified currency code
+        :param int|None since: the earliest time in ms to fetch withdrawals for
+        :param int|None limit: the maximum number of withdrawals structures to retrieve
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns [dict]: a list of `transaction structures <https://docs.ccxt.com/en/latest/manual.html#transaction-structure>`
+        """
         await self.load_markets()
         if limit is None:
             limit = 100
@@ -723,7 +961,7 @@ class bibox(Exchange):
         if code is not None:
             currency = self.currency(code)
             request['symbol'] = currency['id']
-        response = await self.privatePostTransfer({
+        response = await self.v1PrivatePostTransfer({
             'cmd': 'transfer/transferOutList',
             'body': self.extend(request, params),
         })
@@ -802,7 +1040,7 @@ class bibox(Exchange):
         address = self.safe_string(transaction, 'to_address')
         currencyId = self.safe_string(transaction, 'coin_symbol')
         code = self.safe_currency_code(currencyId, currency)
-        timestamp = self.safe_string(transaction, 'createdAt')
+        timestamp = self.safe_integer(transaction, 'createdAt')
         tag = self.safe_string(transaction, 'addr_remark')
         type = self.safe_string(transaction, 'type')
         status = self.parse_transaction_status_by_type(self.safe_string(transaction, 'status'), type)
@@ -850,6 +1088,16 @@ class bibox(Exchange):
         return self.safe_string(self.safe_value(statuses, type, {}), status, status)
 
     async def create_order(self, symbol, type, side, amount, price=None, params={}):
+        """
+        create a trade order
+        :param str symbol: unified symbol of the market to create an order in
+        :param str type: 'market' or 'limit'
+        :param str side: 'buy' or 'sell'
+        :param float amount: how much of currency you want to trade in units of base currency
+        :param float|None price: the price at which the order is to be fullfilled, in units of the quote currency, ignored in market orders
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns dict: an `order structure <https://docs.ccxt.com/en/latest/manual.html#order-structure>`
+        """
         await self.load_markets()
         market = self.market(symbol)
         orderType = 2 if (type == 'limit') else 1
@@ -866,7 +1114,7 @@ class bibox(Exchange):
                 'price': price,
             }, params),
         }
-        response = await self.privatePostOrderpending(request)
+        response = await self.v1PrivatePostOrderpending(request)
         #
         #     {
         #         "result":[
@@ -887,13 +1135,20 @@ class bibox(Exchange):
         }
 
     async def cancel_order(self, id, symbol=None, params={}):
+        """
+        cancels an open order
+        :param str id: order id
+        :param str|None symbol: not used by bibox cancelOrder()
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns dict: An `order structure <https://docs.ccxt.com/en/latest/manual.html#order-structure>`
+        """
         request = {
             'cmd': 'orderpending/cancelTrade',
             'body': self.extend({
                 'orders_id': id,
             }, params),
         }
-        response = await self.privatePostOrderpending(request)
+        response = await self.v1PrivatePostOrderpending(request)
         #
         #     {
         #         "result":[
@@ -910,6 +1165,12 @@ class bibox(Exchange):
         return firstResult
 
     async def fetch_order(self, id, symbol=None, params={}):
+        """
+        fetches information on an order made by the user
+        :param str|None symbol: not used by bibox fetchOrder
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns dict: An `order structure <https://docs.ccxt.com/en/latest/manual.html#order-structure>`
+        """
         await self.load_markets()
         request = {
             'cmd': 'orderpending/order',
@@ -918,7 +1179,7 @@ class bibox(Exchange):
                 'account_type': 0,  # 0 = spot account
             }, params),
         }
-        response = await self.privatePostOrderpending(request)
+        response = await self.v1PrivatePostOrderpending(request)
         #
         #     {
         #         "result":[
@@ -1014,6 +1275,14 @@ class bibox(Exchange):
         return self.safe_string(statuses, status, status)
 
     async def fetch_open_orders(self, symbol=None, since=None, limit=None, params={}):
+        """
+        fetch all unfilled currently open orders
+        :param str|None symbol: unified market symbol
+        :param int|None since: the earliest time in ms to fetch open orders for
+        :param int|None limit: the maximum number of  open orders structures to retrieve
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns [dict]: a list of `order structures <https://docs.ccxt.com/en/latest/manual.html#order-structure>`
+        """
         await self.load_markets()
         market = None
         pair = None
@@ -1030,7 +1299,7 @@ class bibox(Exchange):
                 'size': size,
             }, params),
         }
-        response = await self.privatePostOrderpending(request)
+        response = await self.v1PrivatePostOrderpending(request)
         #
         #     {
         #         "result":[
@@ -1069,6 +1338,14 @@ class bibox(Exchange):
         return self.parse_orders(orders, market, since, limit)
 
     async def fetch_closed_orders(self, symbol=None, since=None, limit=200, params={}):
+        """
+        fetches information on multiple closed orders made by the user
+        :param str symbol: unified market symbol of the market orders were made in
+        :param int|None since: the earliest time in ms to fetch orders for
+        :param int|None limit: the maximum number of  orde structures to retrieve
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns [dict]: a list of [order structures]{@link https://docs.ccxt.com/en/latest/manual.html#order-structure
+        """
         if symbol is None:
             raise ArgumentsRequired(self.id + ' fetchClosedOrders() requires a `symbol` argument')
         await self.load_markets()
@@ -1082,7 +1359,7 @@ class bibox(Exchange):
                 'size': limit,
             }, params),
         }
-        response = await self.privatePostOrderpending(request)
+        response = await self.v1PrivatePostOrderpending(request)
         #
         #     {
         #         "result":[
@@ -1121,6 +1398,14 @@ class bibox(Exchange):
         return self.parse_orders(orders, market, since, limit)
 
     async def fetch_my_trades(self, symbol=None, since=None, limit=None, params={}):
+        """
+        fetch all trades made by the user
+        :param str symbol: unified market symbol
+        :param int|None since: the earliest time in ms to fetch trades for
+        :param int|None limit: the maximum number of trades structures to retrieve
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns [dict]: a list of `trade structures <https://docs.ccxt.com/en/latest/manual.html#trade-structure>`
+        """
         if symbol is None:
             raise ArgumentsRequired(self.id + ' fetchMyTrades() requires a `symbol` argument')
         await self.load_markets()
@@ -1137,7 +1422,7 @@ class bibox(Exchange):
                 'currency_symbol': market['quoteId'],
             }, params),
         }
-        response = await self.privatePostOrderpending(request)
+        response = await self.v1PrivatePostOrderpending(request)
         #
         #     {
         #         "result":[
@@ -1173,6 +1458,12 @@ class bibox(Exchange):
         return self.parse_trades(trades, market, since, limit)
 
     async def fetch_deposit_address(self, code, params={}):
+        """
+        fetch the deposit address for a currency associated with self account
+        :param str code: unified currency code
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns dict: an `address structure <https://docs.ccxt.com/en/latest/manual.html#address-structure>`
+        """
         await self.load_markets()
         currency = self.currency(code)
         request = {
@@ -1181,7 +1472,7 @@ class bibox(Exchange):
                 'coin_symbol': currency['id'],
             }, params),
         }
-        response = await self.privatePostTransfer(request)
+        response = await self.v1PrivatePostTransfer(request)
         #
         #     {
         #         "result":[
@@ -1219,6 +1510,15 @@ class bibox(Exchange):
         }
 
     async def withdraw(self, code, amount, address, tag=None, params={}):
+        """
+        make a withdrawal
+        :param str code: unified currency code
+        :param float amount: the amount to withdraw
+        :param str address: the address to withdraw to
+        :param str|None tag:
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns dict: a `transaction structure <https://docs.ccxt.com/en/latest/manual.html#transaction-structure>`
+        """
         tag, params = self.handle_withdraw_tag_and_params(tag, params)
         self.check_address(address)
         await self.load_markets()
@@ -1236,7 +1536,7 @@ class bibox(Exchange):
         }
         if tag is not None:
             request['address_remark'] = tag
-        response = await self.privatePostTransfer({
+        response = await self.v1PrivatePostTransfer({
             'cmd': 'transfer/transferOut',
             'body': self.extend(request, params),
         })
@@ -1254,7 +1554,13 @@ class bibox(Exchange):
         firstResult = self.safe_value(outerResults, 0, {})
         return self.parse_transaction(firstResult, currency)
 
-    async def fetch_funding_fees(self, codes=None, params={}):
+    async def fetch_transaction_fees(self, codes=None, params={}):
+        """
+        fetch transaction fees
+        :param [str]|None codes: list of unified currency codes
+        :param dict params: extra parameters specific to the bibox api endpoint
+        :returns [dict]: a list of `fee structures <https://docs.ccxt.com/en/latest/manual.html#fee-structure>`
+        """
         # by default it will try load withdrawal fees of all currencies(with separate requests)
         # however if you define codes = ['ETH', 'BTC'] in args it will only load those
         await self.load_markets()
@@ -1271,7 +1577,7 @@ class bibox(Exchange):
                     'coin_symbol': currency['id'],
                 }, params),
             }
-            response = await self.privatePostTransfer(request)
+            response = await self.v1PrivatePostTransfer(request)
             #     {
             #         "result":[
             #             {
@@ -1305,44 +1611,63 @@ class bibox(Exchange):
             'deposit': {},
         }
 
-    def sign(self, path, api='public', method='GET', params={}, headers=None, body=None):
-        url = self.implode_hostname(self.urls['api']) + '/' + self.version + '/' + path
-        cmds = self.json([params])
-        if api == 'public':
+    def sign(self, path, api='v1Public', method='GET', params={}, headers=None, body=None):
+        version, access = api
+        v1 = (version == 'v1')
+        v4 = (version == 'v4')
+        prefix = '/api' if v4 else ''
+        url = self.implode_hostname(self.urls['api']) + prefix + '/' + version + '/' + path
+        json_params = self.json([params]) if v1 else self.json(params)
+        headers = {'content-type': 'application/json'}
+        if access == 'public':
             if method != 'GET':
-                body = {'cmds': cmds}
+                if v1:
+                    body = {'cmds': json_params}
+                else:
+                    body = {'body': json_params}
             elif params:
                 url += '?' + self.urlencode(params)
-        elif api == 'v2private':
-            self.check_required_credentials()
-            url = self.implode_hostname(self.urls['api']) + '/v2/' + path
-            json_params = self.json(params)
-            body = {
-                'body': json_params,
-                'apikey': self.apiKey,
-                'sign': self.hmac(self.encode(json_params), self.encode(self.secret), hashlib.md5),
-            }
         else:
             self.check_required_credentials()
-            body = {
-                'cmds': cmds,
-                'apikey': self.apiKey,
-                'sign': self.hmac(self.encode(cmds), self.encode(self.secret), hashlib.md5),
-            }
+            if version == 'v3' or version == 'v3.1' or version == 'v4':
+                timestamp = self.number_to_string(self.milliseconds())
+                strToSign = timestamp
+                if json_params != '{}':
+                    strToSign += json_params
+                sign = self.hmac(self.encode(strToSign), self.encode(self.secret), hashlib.md5)
+                headers['bibox-api-key'] = self.apiKey
+                headers['bibox-api-sign'] = sign
+                headers['bibox-timestamp'] = timestamp
+                if method == 'GET':
+                    url += '?' + self.urlencode(params)
+                else:
+                    if json_params != '{}':
+                        body = params
+            else:
+                sign = self.hmac(self.encode(json_params), self.encode(self.secret), hashlib.md5)
+                body = {
+                    'apikey': self.apiKey,
+                    'sign': sign,
+                }
+                if v1:
+                    body['cmds'] = json_params
+                else:
+                    body['body'] = json_params
         if body is not None:
             body = self.json(body, {'convertArraysToObjects': True})
-        headers = {'Content-Type': 'application/json'}
         return {'url': url, 'method': method, 'body': body, 'headers': headers}
 
     def handle_errors(self, code, reason, url, method, headers, body, response, requestHeaders, requestBody):
         if response is None:
             return
+        if 'state' in response:
+            if self.safe_number(response, 'state') == 0:
+                return
+            raise ExchangeError(self.id + ' ' + body)
         if 'error' in response:
             if 'code' in response['error']:
                 code = self.safe_string(response['error'], 'code')
                 feedback = self.id + ' ' + body
                 self.throw_exactly_matched_exception(self.exceptions, code, feedback)
                 raise ExchangeError(feedback)
-            raise ExchangeError(self.id + ' ' + body)
-        if not ('result' in response):
             raise ExchangeError(self.id + ' ' + body)
