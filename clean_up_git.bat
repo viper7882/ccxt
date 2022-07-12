@@ -1,0 +1,6 @@
+@echo off
+git remote prune origin
+git repack
+git prune-packed
+git reflog expire --expire=1.month.ago
+git gc --aggressive
