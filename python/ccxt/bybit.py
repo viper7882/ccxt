@@ -2786,6 +2786,19 @@ class bybit(Exchange):
         order = self.safe_value(response, 'result', {})
         return self.parse_order(order)
 
+    def __handle_conditional_order(self, symbol, request, params):
+        isStopOrder = False
+        base_price = self.safe_value(params, 'base_price')
+        if base_price is not None:
+            request['trigger_by'] = 'LastPrice'
+            preciseBasePrice = self.price_to_precision(symbol, base_price)
+            request['base_price'] = float(preciseBasePrice)
+            trigger_price = self.safe_value(params, 'trigger_price')
+            preciseTriggerPrice = self.price_to_precision(symbol, trigger_price)
+            request['stop_px'] = float(preciseTriggerPrice)
+            isStopOrder = True
+        return request, isStopOrder
+
     def create_contract_order(self, symbol, type, side, amount, price=None, params={}):
         self.load_markets()
         market = self.market(symbol)
@@ -2824,7 +2837,7 @@ class bybit(Exchange):
             params = self.omit(params, 'position_idx')
         if market['linear']:
             request['reduce_only'] = self.safe_value_2(params, 'reduce_only', 'reduceOnly', False)
-            request['close_on_trigger'] = self.safe_value(params, 'close_on_trigger', False)
+            request['close_on_trigger'] = False
         isMarket = lowerCaseType == 'market'
         isLimit = lowerCaseType == 'limit'
         if isLimit:
@@ -2856,6 +2869,8 @@ class bybit(Exchange):
             delta = self.number_to_string(market['precision']['price'])
             basePriceString = Precise.string_sub(preciseStopPrice, delta) if isStopLossOrder else Precise.string_add(preciseStopPrice, delta)
             request['base_price'] = float(basePriceString)
+        else:
+            request, isStopOrder = self.__handle_conditional_order(symbol, request, params)
         clientOrderId = self.safe_string(params, 'clientOrderId')
         if clientOrderId is not None:
             request['order_link_id'] = clientOrderId
@@ -4379,7 +4394,7 @@ class bybit(Exchange):
         percentage = Precise.string_mul(Precise.string_div(unrealisedPnl, initialMarginString), '100')
         return {
             'info': position,
-            'symbol': market['symbol'],
+            'symbol': contract,
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
             'initialMargin': self.parse_number(initialMarginString),
