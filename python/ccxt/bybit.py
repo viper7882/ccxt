@@ -38,8 +38,8 @@ class bybit(Exchange):
             # 50 requests per second for GET requests, 1000ms / 50 = 20ms between requests
             # 20 requests per second for POST requests, cost = 50 / 20 = 2.5
             'rateLimit': 20,
-            'hostname': 'bytick.com',  # bybit.com, bytick.com
-            # 'hostname': 'bybit.com',  # bybit.com, bytick.com
+            # 'hostname': 'bytick.com',  # bybit.com, bytick.com
+            'hostname': 'bybit.com',  # bybit.com, bytick.com
             'pro': True,
             'has': {
                 'CORS': True,
@@ -2938,7 +2938,7 @@ class bybit(Exchange):
         order = self.safe_value(response, 'result', {})
         return self.parse_order(order, market)
 
-    def edit_usdc_order(self, id, symbol, type, side, amount=None, price=None, params={}):
+    def edit_usdc_order(self, id, symbol, type, side, amount=None, price=None, price=None, params={}):
         self.load_markets()
         market = self.market(symbol)
         request = {
@@ -2969,7 +2969,7 @@ class bybit(Exchange):
             'id': id,
         }
 
-    def edit_contract_order(self, id, symbol, type, side, amount=None, price=None, params={}):
+    def edit_contract_order(self, id, symbol, type, side, amount=None, price=None, trigger_price=None, params={}):
         if symbol is None:
             raise ArgumentsRequired(self.id + ' editOrder() requires an symbol argument')
         self.load_markets()
@@ -2994,6 +2994,8 @@ class bybit(Exchange):
             request['p_r_qty'] = self.amount_to_precision(symbol, amount)
         if price is not None:
             request['p_r_price'] = self.price_to_precision(symbol, price)
+        if trigger_price is not None:
+            request['p_r_trigger_price'] = self.price_to_precision(symbol, trigger_price)
         method = None
         if market['linear']:
             method = 'privatePostPrivateLinearStopOrderReplace' if isConditionalOrder else 'privatePostPrivateLinearOrderReplace'
@@ -3051,7 +3053,7 @@ class bybit(Exchange):
             'stop_order_id': self.safe_string(result, 'stop_order_id'),
         }
 
-    def edit_order(self, id, symbol, type, side, amount=None, price=None, params={}):
+    def edit_order(self, id, symbol, type, side, amount=None, price=None, trigger_price=None, params={}):
         if symbol is None:
             raise ArgumentsRequired(self.id + ' editOrder() requires an symbol argument')
         self.load_markets()
@@ -3062,7 +3064,7 @@ class bybit(Exchange):
         elif isUsdcSettled:
             return self.edit_usdc_order(id, symbol, type, side, amount, price, params)
         else:
-            return self.edit_contract_order(id, symbol, type, side, amount, price, params)
+            return self.edit_contract_order(id, symbol, type, side, amount, price, trigger_price, params)
 
     def cancel_order(self, id, symbol=None, params={}):
         """
