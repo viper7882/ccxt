@@ -2938,7 +2938,7 @@ class bybit(Exchange):
         order = self.safe_value(response, 'result', {})
         return self.parse_order(order, market)
 
-    def edit_usdc_order(self, id, symbol, type, side, amount=None, price=None, price=None, params={}):
+    def edit_usdc_order(self, id, symbol, type, side, amount=None, price=None, params={}):
         self.load_markets()
         market = self.market(symbol)
         request = {
