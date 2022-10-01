@@ -2883,21 +2883,22 @@ class bybit(Exchange):
         else:
             # inverse swaps
             method = 'privatePostV2PrivateStopOrderCreate' if isStopOrder else 'privatePostV2PrivateOrderCreate'
-        response = None
-        try:
-            response = getattr(self, method)(self.extend(request, params))
-        except (BadRequest, InvalidOrder, ExchangeError):
-            traceback.print_exc()
-            print("{} Line: {}: request:".format(
-                inspect.getframeinfo(inspect.currentframe()).function,
-                inspect.getframeinfo(inspect.currentframe()).lineno,
-            ))
-            pprint(request)
-            print("{} Line: {}: params:".format(
-                inspect.getframeinfo(inspect.currentframe()).function,
-                inspect.getframeinfo(inspect.currentframe()).lineno,
-            ))
-            pprint(params)
+        response = getattr(self, method)(self.extend(request, params))
+        # response = None
+        # try:
+        #     response = getattr(self, method)(self.extend(request, params))
+        # except (BadRequest, InvalidOrder, ExchangeError):
+        #     traceback.print_exc()
+        #     print("{} Line: {}: request:".format(
+        #         inspect.getframeinfo(inspect.currentframe()).function,
+        #         inspect.getframeinfo(inspect.currentframe()).lineno,
+        #     ))
+        #     pprint(request)
+        #     print("{} Line: {}: params:".format(
+        #         inspect.getframeinfo(inspect.currentframe()).function,
+        #         inspect.getframeinfo(inspect.currentframe()).lineno,
+        #     ))
+        #     pprint(params)
         #
         #    {
         #        "ret_code":0,
